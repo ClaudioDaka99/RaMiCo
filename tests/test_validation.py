@@ -259,3 +259,13 @@ class TestExplainerParameters:
             empty = fit(data, model=lambda X: np.zeros(len(X), dtype=int))
         assert len(empty) == 0 and empty.records.empty
         assert empty.metadata["mined_indices"]  # factuals were mined, none flipped the model
+
+
+def test_gower_uses_numerical_columns_whose_maximum_is_zero():
+    # gower 0.1.2 divides by the maximum of a column and so ignores a column whose maximum is 0
+    x = pd.DataFrame({"t": [-10.0, -5.0, 0.0]})
+    expected = np.abs(x["t"].to_numpy()[:, None] - x["t"].to_numpy()[None, :]) / 10
+    np.testing.assert_allclose(gower_matrix(x), expected, rtol=1e-6)  # numerical data: through gower
+    mixed = x.assign(c=pd.Series(["a", "a", "a"], dtype=object))
+    np.testing.assert_allclose(gower_matrix(mixed), expected / 2, rtol=1e-6)  # mixed data: blocks of rows
+    np.testing.assert_allclose(gower_rows(mixed.iloc[:1], mixed), [[0.0, 0.25, 0.5]], rtol=1e-6)

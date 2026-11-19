@@ -52,12 +52,38 @@ def gower_matrix(x: pd.DataFrame, y: pd.DataFrame | None = None) -> np.ndarray:
 
     import gower  # imported on first use: it pulls in scipy
 
+    x, y = _shift_zero_maxima(x, y)
     if y is x:
         return gower.gower_matrix(x)
     if len(x) == len(y):
         both = pd.concat([x, y], ignore_index=True)
         return gower.gower_matrix(both)[: len(x), len(x) :]
     return gower.gower_matrix(x, y)
+
+
+def _shift_zero_maxima(x: pd.DataFrame, y: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """``x`` and ``y`` with every numerical column whose maximum is 0 shifted to start at 0.
+
+    gower divides a numerical column by its maximum and so ignores a column
+    whose values are all negative or zero with a maximum of 0. Shifting a
+    column changes none of its Gower distances, which depend on differences
+    and on the range; the other columns are left untouched.
+    """
+    shifts = {}
+    for column in x.columns:
+        if not (is_numpy_number(x[column].dtype) and is_numpy_number(y[column].dtype)):
+            continue
+        values = x[column].to_numpy(np.float64) if y is x else np.concatenate([x[column], y[column]]).astype(np.float64)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)  # all-NaN columns
+            low, high = np.nanmin(values), np.nanmax(values)
+        if high == 0 and low < 0:
+            shifts[column] = low
+    if not shifts:
+        return x, y
+    shifted_x = x.assign(**{column: x[column] - low for column, low in shifts.items()})
+    shifted_y = shifted_x if y is x else y.assign(**{column: y[column] - low for column, low in shifts.items()})
+    return shifted_x, shifted_y
 
 
 #: dtype of ``1 - np.float32(x)``: float32 under NEP 50 (numpy >= 2), float64 before
@@ -98,9 +124,16 @@ def _codes(
 
 
 def _scales(low: np.ndarray, high: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """gower's maxima and ranges from the float32 minima and maxima of the columns."""
+    """gower's maxima and ranges from the float32 minima and maxima of the columns.
+
+    gower ignores a column whose maximum is 0; such a column is scaled by its
+    minimum instead, which gives its true Gower distances (the difference
+    over the range). Every other column keeps gower's arithmetic, bit for bit.
+    """
     high = np.where(np.isnan(high), np.float32(0), high)
     low = np.where(np.isnan(low), np.float32(0), low)
+    zero_max = (high == 0) & (low != 0)
+    high, low = np.where(zero_max, low, high), np.where(zero_max, high, low)
     with np.errstate(invalid="ignore", divide="ignore"):
         # gower computes 1 - min / max on float32 scalars: float32 with numpy 2, float64 before (NEP 50)
         ratio = (low / high).astype(_ONE_MINUS_FLOAT32)
