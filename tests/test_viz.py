@@ -526,3 +526,38 @@ def test_comparison_table_by_model(results):
     assert "MLP" in html and "XGBoost" in html and "within each metric and model" in html
     assert "3 runs per strategy and model" in html
     assert html.count("±") == 2 * 3 * 3 + 1  # two models × three metrics × three strategies, and the subtitle
+
+
+def test_sensitivity_table_leaves_cells_without_runs_empty(results):
+    pytest.importorskip("great_tables")
+    from ramico import viz
+
+    # s varied at a fixed k, then k at a fixed s: the corner (s=6, k=6) has no run
+    grid = pd.concat(
+        [results.assign(n_factuals=s, n_counterfactuals=k) for s, k in ((4, 4), (6, 4), (4, 6))], ignore_index=True
+    )
+    html = viz.sensitivity_table(grid).as_raw_html()
+    assert "nan" not in html
+
+
+def test_plot_rule_of_an_empty_ruleset(rules):
+    pytest.importorskip("plotly")
+    from ramico import viz
+
+    with pytest.raises(ValueError, match="no rules to draw"):
+        viz.plot_rule(rules.filter(feature="no such feature"))
+
+
+def test_pareto_labels_let_the_runs_behind_them_show(results):
+    pytest.importorskip("plotly")
+    from ramico import viz
+
+    labels = [a for a in viz.plot_pareto(results).layout.annotations if a.text in set(results["strategy"])]
+    assert labels and all(a.bgcolor.startswith("rgba(") and a.bgcolor.endswith(",0.7)") for a in labels)
+
+
+def test_support_bars_share_the_scale_of_the_highest_support(rules):
+    top = rules.to_frame()["support"].max()
+    html = rules._repr_html_()
+    assert "width:100.0%" in html  # the rule with the highest support fills its bar
+    assert f"{top:.2f}%" in html

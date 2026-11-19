@@ -72,7 +72,7 @@ def rules_table(rules: RuleSet, max_rules: int = 12, title: str | None = None) -
     subtitle = (
         f"{rules.strategy} strategy · {meta.get('n_factuals')} factuals × "
         f"{meta.get('n_counterfactuals')} counterfactuals per class · "
-        f"{len(frame)} rules from {len(rules.records)} records"
+        f"{len(frame):,} rules from {len(rules.records):,} records"
     )
     styled = (
         gt.GT(table, groupname_col="transition")
@@ -232,9 +232,13 @@ def sensitivity_table(results: pd.DataFrame, title: str | None = None) -> Any:
         low, high = float(mean.min().min()), float(mean.max().max())
         for k in ks:
             column = f"{metric}_{k}"
-            table[column] = [f"{mean.loc[s, k]:.{digits}f} ± {std.loc[s, k]:.{digits}f}" for s in table["s"]]
+            table[column] = [_mean_std(mean.loc[s, k], std.loc[s, k], digits) for s in table["s"]]
             shades[column] = [
-                SEQUENTIAL[round(6 * (mean.loc[s, k] - low) / (high - low))] if high > low else SEQUENTIAL[0]
+                None  # no run with this s and k
+                if pd.isna(mean.loc[s, k])
+                else SEQUENTIAL[round(6 * (mean.loc[s, k] - low) / (high - low))]
+                if high > low
+                else SEQUENTIAL[0]
                 for s in table["s"]
             ]
     runs = results.groupby(["n_factuals", "n_counterfactuals"]).size()
@@ -255,8 +259,16 @@ def sensitivity_table(results: pd.DataFrame, title: str | None = None) -> Any:
         )
         for column in columns:
             for row, colour in enumerate(shades[column]):
-                styled = styled.tab_style(gt.style.fill(color=colour), gt.loc.body(columns=column, rows=[row]))
+                if colour is not None:
+                    styled = styled.tab_style(gt.style.fill(color=colour), gt.loc.body(columns=column, rows=[row]))
     return styled.cols_align("center")
+
+
+def _mean_std(mean: float, std: float, digits: int) -> str:
+    """ "mean ± std", the mean alone for a single run, nothing for a cell without runs."""
+    if pd.isna(mean):
+        return ""
+    return f"{mean:.{digits}f}" if pd.isna(std) else f"{mean:.{digits}f} ± {std:.{digits}f}"
 
 
 def _span(counts: pd.Series) -> str:

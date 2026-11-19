@@ -135,7 +135,7 @@ class Rule:
         return (
             f"{self.feature}: {self.change}  |  class {self.from_name or self.from_class} -> "
             f"{self.to_name or self.to_class}  |  support {self.support:.2f}% "
-            f"({self.n_records} records)  |  implausibility {self.implausibility:.3f}"
+            f"({self.n_records:,} records)  |  implausibility {self.implausibility:.3f}"
         )
 
     def _repr_html_(self) -> str:
@@ -161,7 +161,7 @@ class Rule:
                 f"{html.escape(str(self.from_name or self.from_class))} → "
                 f"{html.escape(str(self.to_name or self.to_class))}",
             ),
-            cell("support", f"{self.support:.2f}% · {self.n_records} records"),
+            cell("support", f"{self.support:.2f}% · {self.n_records:,} records"),
             cell("implausibility", f"{_chip(self.implausibility)} ± {self.implausibility_std:.3f}"),
         ]
         return (
@@ -188,8 +188,9 @@ def _chip(value: float) -> str:
     )
 
 
-def _bar(support: float) -> str:
-    width = min(max(support, 0.0), 100.0)
+def _bar(support: float, top: float = 100.0) -> str:
+    """A support bar, full for a support of ``top`` (the highest support shown), and its value in %."""
+    width = min(max(100.0 * support / top, 0.0), 100.0) if top > 0 else 0.0
     return (
         '<div style="display:flex;align-items:center;gap:6px">'
         '<div style="width:90px;height:7px;border-radius:4px;background:rgba(127,127,127,.25)">'
@@ -613,7 +614,7 @@ class RuleSet:
             'line-height:1.45;max-width:1000px">'
             '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">'
             '<span style="font-size:16px;font-weight:700">RaMiCo rules</span>'
-            f'<span style="opacity:.75">{len(self)} rules from {len(self._records)} records</span></div>'
+            f'<span style="opacity:.75">{len(self):,} rules from {len(self._records):,} records</span></div>'
             f'<div style="opacity:.75;margin-bottom:6px">{subtitle}</div>'
         )
         if not len(self):
@@ -621,6 +622,7 @@ class RuleSet:
 
         frame = self.to_frame()
         several = frame["strategy"].nunique() > 1
+        top = float(frame["support"].max())  # the bars of all the transitions share one scale
         theme = _theme()
         colours = theme.strategy_colors(sorted(frame["strategy"].unique(), key=theme.strategy_sort_key))
         blocks = []
@@ -640,9 +642,9 @@ class RuleSet:
                 cells = [
                     f"<code>{html.escape(str(rule.feature))}</code>",
                     html.escape(rule._change("→")),
-                    _bar(float(rule.support)),
+                    _bar(float(rule.support), top),
                     _chip(rule.implausibility),
-                    str(rule.n_records),
+                    f"{rule.n_records:,}",
                 ] + ([_strategy_tag(str(rule.strategy), colours[rule.strategy])] if several else [])
                 rows.append(
                     '<tr style="border-top:1px solid rgba(127,127,127,.2)">'

@@ -147,6 +147,8 @@ def plot_rule(rules: RuleSet, rule: Rule | int = 0, mode: Mode = "light") -> Any
     plotly.graph_objects.Figure
     """
     go = _plotly()
+    if not len(rules):
+        raise ValueError("the RuleSet has no rules to draw")
     if not isinstance(rule, Rule):
         rule = rules[rule]
     behind = rules.records_of(rule)
@@ -939,7 +941,8 @@ def _label_means(
             break
         group += [i for i in rest if i not in places]
     ink = INK[mode]
-    common = dict(font=dict(color=ink["primary"]), bgcolor=ink["surface"], borderpad=2)
+    # a translucent background keeps the labels readable and the runs behind them visible
+    common = dict(font=dict(color=ink["primary"]), bgcolor=_translucent(ink["surface"], 0.7), borderpad=2)
     gap = _MARKER_RADIUS + 3
     for i, (x, y) in enumerate(means[columns].to_numpy(float)):
         if i in places:
@@ -955,6 +958,12 @@ def _label_means(
                 x=x, y=y, text=texts[i], ax=ax, ay=ay, axref="x", ayref="y", xanchor="left" if right else "right",
                 showarrow=True, arrowhead=0, arrowwidth=1, arrowcolor=ink["muted"], standoff=_MARKER_RADIUS, **common,
             )  # fmt: skip
+
+
+def _translucent(colour: str, alpha: float) -> str:
+    """A "#rrggbb" colour as "rgba(r,g,b,alpha)"."""
+    red, green, blue = (int(colour.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4))
+    return f"rgba({red},{green},{blue},{alpha})"
 
 
 def _pareto_front(points: pd.DataFrame) -> pd.DataFrame:

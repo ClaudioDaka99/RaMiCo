@@ -383,3 +383,8 @@ class TestJsonValues:
         assert [type(v) for v in restored["mixed"]] == [int, str, float]
         with pytest.raises(ValueError, match="repeated"):
             _io.encode_table(pd.DataFrame([[1, 2]], columns=["a", "a"]))
+
+
+def test_large_counts_have_thousands_separators():
+    assert "(1,234 records)" in str(make_rule(n_records=1234))
+    assert "1,234 records" in make_rule(n_records=1234)._repr_html_()
