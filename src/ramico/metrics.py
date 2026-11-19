@@ -44,7 +44,7 @@ import pandas as pd
 from ramico._distance import gower_matrix, gower_rows
 from ramico._ruleset import FACTUAL_PREFIX, RuleSet
 from ramico._scores import Scores
-from ramico._validation import BlackBox, numerical_features
+from ramico._validation import BlackBox, ModelView, numerical_features
 from ramico.exceptions import DataError
 
 __all__ = ["Scores", "evaluate", "fidelity", "implausibility", "incomprehensibility"]
@@ -98,9 +98,15 @@ def _records(rules: Rules, X: pd.DataFrame) -> pd.DataFrame:
 
 
 def _prepare(rules: Rules, X: Any) -> pd.DataFrame:
+    """``X`` converted as :meth:`RaMiCo.fit` converted the data the rules come from."""
     if not isinstance(X, pd.DataFrame):
-        raise DataError("X must be a DataFrame with the columns the rules were extracted from")
+        features = rules._features if isinstance(rules, RuleSet) else None
+        values = np.asarray(X)
+        if features is None or values.ndim != 2 or values.shape[1] != len(features):
+            raise DataError("X must be a DataFrame, or an array with the columns the rules were extracted from")
+        X = pd.DataFrame(values, columns=features)
     X = X.copy()
+    X.columns = [str(c) for c in X.columns]
     categorical = rules.metadata.get("categorical_features", []) if isinstance(rules, RuleSet) else []
     for column in X.columns:
         dtype = X[column].dtype
@@ -264,8 +270,9 @@ def _successes(model: BlackBox, chains: _Chains, mode: str) -> np.ndarray:
 def _rule_chains(model: Any, rules: Rules, X: Any, k: int) -> tuple[BlackBox, pd.DataFrame, _Chains]:
     if not isinstance(k, (int, np.integer)) or k < 1:
         raise ValueError(f"k must be a positive integer, got {k!r}")
-    black_box = BlackBox(model)
-    X = _prepare(rules, X)
+    prepared = _prepare(rules, X)
+    black_box = BlackBox(model, ModelView.between(X, prepared))
+    X = prepared
     return black_box, X, _chains(black_box, _records(rules, X), X, int(k), set(numerical_features(X)))
 
 

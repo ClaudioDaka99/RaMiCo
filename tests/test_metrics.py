@@ -181,8 +181,10 @@ def test_invalid_inputs(setup):
     model, rules, X = setup
     with pytest.raises(ValueError, match="mode must be one of"):
         metrics.fidelity(model, rules, X, mode="xor")
-    with pytest.raises(DataError, match="X must be a DataFrame"):
-        metrics.fidelity(model, rules, X.to_numpy())
+    with pytest.raises(DataError, match="X must be a DataFrame, or an array"):
+        metrics.fidelity(model, rules, X.to_numpy()[:, :-1])  # one column short
+    with pytest.raises(DataError, match="X must be a DataFrame, or an array"):
+        metrics.fidelity(model, rules.records, X.to_numpy())  # records alone do not name the columns
     with pytest.raises(TypeError, match="rules must be a RuleSet or a DataFrame"):
         metrics.fidelity(model, [1, 2], X)
     with pytest.raises(DataError, match=r"the records lack the columns \['to_value'\]"):

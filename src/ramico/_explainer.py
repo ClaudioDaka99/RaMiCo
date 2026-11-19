@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 import numbers
 import warnings
@@ -18,6 +19,7 @@ from ramico._records import pair_records
 from ramico._ruleset import RuleSet, empty_rules
 from ramico._validation import (
     BlackBox,
+    ModelView,
     RandomState,
     check_data,
     check_random_state,
@@ -208,10 +210,12 @@ class RaMiCo:
             ``model`` has no usable ``predict``.
         """
         strategy, distance = self._check_parameters()
+        given = X
         X, labels = check_data(X, y, categorical_features, feature_names)
-        model = BlackBox(self.model)
+        model = BlackBox(self.model, ModelView.between(given, X))
         rng = check_random_state(self.random_state)
-        seed = int(self.random_state) if isinstance(self.random_state, numbers.Integral) else None
+        integer_seed = isinstance(self.random_state, numbers.Integral)
+        seed = int(self.random_state) if isinstance(self.random_state, numbers.Integral) else _forest_seed(rng)
         classes = [c.item() if isinstance(c, np.generic) else c for c in pd.unique(labels)]
         names = _class_names(class_names, classes)
 
@@ -237,7 +241,7 @@ class RaMiCo:
             "strategy": strategy.name,
             "n_factuals": self.n_factuals,
             "n_counterfactuals": self.n_counterfactuals,
-            "random_state": self.random_state if seed is not None or self.random_state is None else "generator",
+            "random_state": self.random_state if integer_seed or self.random_state is None else "generator",
             "isolation_forest": scorer.engine,
             "classes": classes,
             "class_names": names,
@@ -256,6 +260,18 @@ class RaMiCo:
             return empty_rules(features, metadata)
         records = pd.concat(collected, ignore_index=True)
         return RuleSet(aggregate(records, metadata["numerical_features"]), records, features, metadata)
+
+
+def _forest_seed(rng: np.random.RandomState | np.random.Generator) -> int:
+    """A seed for the native Isolation Forest, drawn from a copy of ``rng`` so that ``rng`` keeps its state.
+
+    The mining strategies then draw the same numbers as without the forest,
+    and the forest is reproducible whenever ``rng`` is.
+    """
+    twin = copy.deepcopy(rng)
+    if isinstance(twin, np.random.Generator):
+        return int(twin.integers(0, 2**31 - 1))
+    return int(twin.randint(0, 2**31 - 1))
 
 
 def _class_names(class_names: ClassNames, classes: list) -> dict | None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numbers
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Any, TypeAlias
 
 import numpy as np
@@ -33,10 +34,65 @@ def check_random_state(random_state: RandomState) -> np.random.RandomState | np.
     )
 
 
+#: Columns of the internal records: a feature with one of these names would be confused with them.
+RESERVED_NAMES = frozenset(
+    {
+        "feature",
+        "original_value",
+        "switched_value",
+        "original_prediction",
+        "switched_prediction",
+        "anomaly_score",
+        "expected_label",
+        "sample_index",
+        "method",
+    }
+)
+
+
+@dataclass(frozen=True)
+class ModelView:
+    """The data as the model was trained on them: the caller's column labels and dtypes.
+
+    :func:`check_data` names the columns by strings and turns the categorical
+    ones into object columns, as the distances need; the model gets them back
+    as they were, e.g. category columns for XGBoost's native categories or
+    integer labels for a function that reads ``X[0]``.
+    """
+
+    labels: tuple[Any, ...] | None = None
+    dtypes: tuple[tuple[str, Any], ...] = ()
+
+    @classmethod
+    def between(cls, original: Any, frame: pd.DataFrame) -> ModelView:
+        """What :func:`check_data` changed when it turned ``original`` into ``frame``."""
+        if isinstance(original, pd.DataFrame):
+            source, labels = original, list(original.columns)
+        else:
+            source, labels = pd.DataFrame(np.asarray(original), columns=frame.columns), list(frame.columns)
+        names = [str(label) for label in labels]
+        changed = tuple(
+            (name, source[label].dtype)
+            for name, label in zip(names, labels, strict=True)
+            if name in frame.columns and frame[name].dtype != source[label].dtype
+        )
+        return cls(tuple(labels) if labels != names else None, changed)
+
+    def apply(self, frame: pd.DataFrame) -> pd.DataFrame:
+        """``frame`` with the caller's dtypes and column labels."""
+        if self.dtypes:
+            present = {name: dtype for name, dtype in self.dtypes if name in frame.columns}
+            if present:
+                frame = frame.astype(present)
+        if self.labels is not None and [str(label) for label in self.labels] == list(frame.columns):
+            frame = frame.set_axis(list(self.labels), axis=1)
+        return frame
+
+
 class BlackBox:
     """Uniform ``predict`` around an estimator or a prediction function."""
 
-    def __init__(self, model: Any) -> None:
+    def __init__(self, model: Any, view: ModelView | None = None) -> None:
         if hasattr(model, "predict") and callable(model.predict):
             self._predict: Callable[[pd.DataFrame], Any] = model.predict
         elif callable(model):
@@ -46,9 +102,10 @@ class BlackBox:
                 "model must have a predict(X) method or be a function returning one label "
                 f"per row, got {type(model).__name__}"
             )
+        self._view = view or ModelView()
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
-        labels = np.asarray(self._predict(X))
+        labels = np.asarray(self._predict(self._view.apply(X)))
         if labels.ndim == 2 and labels.shape[1] == 1:
             labels = labels.ravel()
         if labels.ndim != 1 or len(labels) != len(X):
@@ -100,9 +157,13 @@ def check_data(
         if len(names) != values.shape[1]:
             raise DataError(f"{len(names)} feature names for {values.shape[1]} columns")
         frame = pd.DataFrame(values, columns=names)
+    labels_given = list(frame.columns)
     frame.columns = [str(c) for c in frame.columns]
     if frame.columns.duplicated().any():
         raise DataError(f"duplicated column names: {sorted(set(frame.columns[frame.columns.duplicated()]))}")
+    reserved = sorted(RESERVED_NAMES.intersection(frame.columns))
+    if reserved:
+        raise DataError(f"the feature names {reserved} are used by RaMiCo's records: rename these columns")
     if len(frame) < 2:
         raise DataError("X needs at least two rows")
     if frame.isna().to_numpy().any():
@@ -121,7 +182,9 @@ def check_data(
 
     declared: list[str] = []
     for feature in categorical_features or []:
-        if isinstance(feature, numbers.Integral) and not isinstance(feature, bool):
+        if isinstance(X, pd.DataFrame) and not isinstance(feature, bool) and feature in labels_given:
+            declared.append(str(feature))  # a column label, even an integer one
+        elif isinstance(feature, numbers.Integral) and not isinstance(feature, bool):
             if not 0 <= feature < frame.shape[1]:
                 raise DataError(f"categorical feature index {feature} is out of range")
             declared.append(frame.columns[feature])

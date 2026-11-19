@@ -14,7 +14,7 @@ import _harness as h
 
 from ramico import RaMiCo
 from ramico._distance import gower_matrix, gower_rows
-from ramico._validation import BlackBox, check_data, check_random_state, free_column_name
+from ramico._validation import BlackBox, ModelView, check_data, check_random_state, free_column_name
 from ramico.exceptions import DataError, ModelError, RaMiCoError
 
 LABELS = np.array([0, 1, 0, 1, 0, 1])
@@ -269,3 +269,72 @@ def test_gower_uses_numerical_columns_whose_maximum_is_zero():
     mixed = x.assign(c=pd.Series(["a", "a", "a"], dtype=object))
     np.testing.assert_allclose(gower_matrix(mixed), expected / 2, rtol=1e-6)  # mixed data: blocks of rows
     np.testing.assert_allclose(gower_rows(mixed.iloc[:1], mixed), [[0.0, 0.25, 0.5]], rtol=1e-6)
+
+
+def test_reserved_feature_names_are_rejected():
+    with pytest.raises(DataError, match="used by RaMiCo's records"):
+        check_data(small_frame().rename(columns={"a": "method"}), LABELS)
+
+
+def test_categorical_features_of_a_dataframe_are_column_labels():
+    X = pd.DataFrame({5: [1, 2, 3, 4, 5, 6], 0: [0, 1, 0, 1, 0, 1]})
+    frame, _ = check_data(X, LABELS, categorical_features=[0])  # the column labelled 0, not the first one
+    assert pd.api.types.is_object_dtype(frame["0"]) and not pd.api.types.is_object_dtype(frame["5"])
+    frame, _ = check_data(small_frame(), LABELS, categorical_features=[0])  # no such label: a position
+    assert frame["a"].dtype == object
+
+
+def test_the_model_gets_the_labels_and_dtypes_it_was_trained_on():
+    X = pd.DataFrame({0: [1.0, 2.0, 3.0, 4.0], 1: pd.Categorical(["a", "b", "a", "b"]), 2: [0, 1, 0, 1]})
+    frame, _ = check_data(X, [0, 1, 0, 1], categorical_features=[2])
+    assert list(frame.columns) == ["0", "1", "2"]
+    assert pd.api.types.is_object_dtype(frame["1"]) and pd.api.types.is_object_dtype(frame["2"])
+    pd.testing.assert_frame_equal(ModelView.between(X, frame).apply(frame), X)
+    codes = np.array([[0.0, 1.5], [1.0, 2.5], [2.0, 0.5], [1.0, 1.0]])
+    frame, _ = check_data(codes, [0, 1, 0, 1], categorical_features=[0])  # integer codes stored as floats
+    seen = []
+    box = BlackBox(lambda d: seen.append(list(d.dtypes)) or np.zeros(len(d)), ModelView.between(codes, frame))
+    box.predict(frame)
+    assert seen == [[np.dtype("float64"), np.dtype("float64")]]
+
+
+def test_fit_and_metrics_call_the_model_on_the_callers_frame():
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({0: rng.uniform(0, 10, 80), 1: pd.Categorical(rng.choice(["a", "b"], 80))})
+    calls = []
+
+    def model(d):  # reads the integer labels and needs the category dtype, as XGBoost's native categories do
+        assert isinstance(d[1].dtype, pd.CategoricalDtype)
+        calls.append(len(d))
+        return ((d[0] > 5) | (d[1] == "a")).astype(int).to_numpy()
+
+    y = model(X)
+    rules = RaMiCo(model, "random", n_factuals=5, n_counterfactuals=5, random_state=0, isolation_forest="native").fit(
+        X, y
+    )
+    assert len(rules) > 0
+    from ramico import metrics
+
+    scores = metrics.evaluate(model, rules, X)
+    assert np.isfinite(scores.fidelity) and calls
+
+
+@pytest.mark.parametrize("make_state", [lambda: np.random.default_rng(3), lambda: np.random.RandomState(3)])
+def test_the_native_forest_follows_any_random_state(data, make_state):
+    X, y = data
+
+    def fit():
+        explainer = RaMiCo(h.ToyModel(2), "random", n_factuals=4, n_counterfactuals=3, isolation_forest="native")
+        explainer.random_state = make_state()
+        return explainer.fit(X, y, categorical_features=CATEGORICAL)
+
+    pd.testing.assert_frame_equal(fit().records, fit().records)  # implausibility included
+
+
+def test_the_native_forest_follows_numpy_global_state(data):
+    X, y = data
+    explainer = RaMiCo(h.ToyModel(2), "random", n_factuals=4, n_counterfactuals=3, isolation_forest="native")
+    np.random.seed(11)  # noqa: NPY002  # the global state is what is tested
+    first = explainer.fit(X, y, categorical_features=CATEGORICAL)
+    np.random.seed(11)  # noqa: NPY002
+    pd.testing.assert_frame_equal(explainer.fit(X, y, categorical_features=CATEGORICAL).records, first.records)
