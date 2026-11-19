@@ -3,6 +3,7 @@
     python tools/run_tutorials.py                  # the published tutorials with their own QUICK, in place
     python tools/run_tutorials.py 02               # some of them; any notebook of examples/ by its prefix
     python tools/run_tutorials.py --quick --out build/notebooks   # quick mode, elsewhere (as in CI)
+    python tools/run_tutorials.py --quick --model mlp --out build/notebooks-mlp   # with the paper's MLP
     python tools/run_tutorials.py --full 02        # full mode, whatever the QUICK of the notebook
 
 Each notebook runs with papermill from examples/, with the static PNG copies of the figures turned on
@@ -27,12 +28,14 @@ EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 TUTORIALS = ("01_quickstart", "02_mining_strategies")
 
 
-def run(notebook: Path, output: Path, quick: bool | None, timeout: int | None) -> float:
+def run(notebook: Path, output: Path, quick: bool | None, timeout: int | None, model: str | None = None) -> float:
     env = dict(os.environ, RAMICO_STATIC_FIGURES="1", PYTHONIOENCODING="utf-8")
     command = [sys.executable, "-m", "papermill", str(notebook), str(output), "--cwd", str(EXAMPLES)]
     command += ["-k", "python3", "--log-level", "WARNING", "--no-progress-bar"]
     if quick is not None:
         command += ["-p", "QUICK", str(quick)]
+    if model is not None:
+        command += ["-p", "MODEL", model]
     if timeout:
         command += ["--execution-timeout", str(timeout)]
     start = time.perf_counter()
@@ -57,6 +60,7 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--quick", action="store_true", help="run with QUICK = True")
     mode.add_argument("--full", action="store_true", help="run with QUICK = False")
+    parser.add_argument("--model", choices=["xgboost", "mlp"], help="black box of the paper (default: the notebook's)")
     parser.add_argument("--out", type=Path, help="folder for the executed notebooks (default: in place)")
     parser.add_argument("--timeout", type=int, help="seconds allowed to each cell")
     args = parser.parse_args()
@@ -70,7 +74,7 @@ def main() -> None:
     for notebook in notebooks:
         output = (args.out / notebook.name) if args.out else notebook
         quick = True if args.quick else False if args.full else None
-        elapsed = run(notebook, output.resolve(), quick, args.timeout)
+        elapsed = run(notebook, output.resolve(), quick, args.timeout, args.model)
         print(f"{notebook.name}: {elapsed:.0f} s, {output.stat().st_size / 1024:.0f} KB")
 
 

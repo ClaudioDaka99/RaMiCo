@@ -59,11 +59,17 @@ jobs:
         run: >
           python tools/run_tutorials.py --quick --out build/notebooks
           --timeout ${{ github.event.inputs.notebook_timeout || vars.NOTEBOOK_TIMEOUT || '1800' }}
+      - name: Run them with the MLP of the paper
+        run: >
+          python tools/run_tutorials.py --quick --model mlp --out build/notebooks-mlp
+          --timeout ${{ github.event.inputs.notebook_timeout || vars.NOTEBOOK_TIMEOUT || '1800' }}
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: notebooks-quick
-          path: build/notebooks/
+          path: |
+            build/notebooks/
+            build/notebooks-mlp/
 
   docs:
     runs-on: ubuntu-latest

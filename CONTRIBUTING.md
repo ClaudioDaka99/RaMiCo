@@ -41,6 +41,7 @@ show them. After changing a tutorial or anything it displays, run it again:
 ```bash
 python tools/run_tutorials.py 01            # full mode, written in place
 python tools/run_tutorials.py --quick --out build/notebooks   # the published tutorials in quick mode, as CI does
+python tools/run_tutorials.py --quick --model mlp --out build/notebooks-mlp   # the same with the paper's MLP
 ```
 
 Only tutorials 01 and 02 are published for now: `run_tutorials.py`, CI and the documentation take these two, and any
