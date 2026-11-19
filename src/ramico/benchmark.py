@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import pickle
 import sys
 import time
 import warnings
@@ -180,6 +181,9 @@ def run_benchmark(
         "isolation_forest": isolation_forest,
         "n_samples": len(X),
         "data": _digest(pd.util.hash_pandas_object(X, index=True).to_numpy(), _label_hashes(labels)),
+        "columns": [str(column) for column in X.columns],
+        "dtypes": [str(dtype) for dtype in X.dtypes],  # the same values as numbers or categories are other data
+        "ramico": _ramico_version(),
         "categorical_features": None if categorical_features is None else [str(c) for c in categorical_features],
     }
     cache = Path(cache_dir) if cache_dir is not None else None
@@ -260,12 +264,43 @@ def _model_key(model: Any) -> str:
             params = None
     if not isinstance(params, dict):
         params = vars(model) if hasattr(model, "__dict__") else {"repr": model}
-    described = {
-        str(name): type(value).__qualname__ if hasattr(value, "get_params") else repr(value)
-        for name, value in params.items()
-    }
+    described = {str(name): _describe(value) for name, value in params.items()}
     text = f"{type(model).__module__}.{type(model).__qualname__} {json.dumps(described, sort_keys=True)}"
+    if " at 0x" in text:
+        warnings.warn(
+            f"the cache cannot recognise this model in another run: part of it is described by a memory address "
+            f"({type(model).__qualname__}); its results will be recomputed",
+            RuntimeWarning,
+            stacklevel=3,
+        )
     return _digest(np.frombuffer(text.encode("utf-8"), dtype=np.uint8))
+
+
+def _describe(value: Any) -> Any:
+    """A description of a model parameter that does not change from one run to the next, when possible."""
+    if hasattr(value, "get_params"):  # an estimator: its own parameters are listed with deep=True
+        return type(value).__qualname__
+    if isinstance(value, (list, tuple)):
+        return [_describe(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _describe(item) for key, item in value.items()}
+    if isinstance(value, (np.random.RandomState, np.random.Generator)):
+        return f"{type(value).__qualname__} {_digest(np.frombuffer(pickle.dumps(value), dtype=np.uint8))}"
+    code = getattr(value, "__code__", None)
+    if code is not None:  # a function or a lambda: its name and its code
+        payload = code.co_code + repr(code.co_consts).encode("utf-8")
+        return f"{value.__module__}.{value.__qualname__} {_digest(np.frombuffer(payload, dtype=np.uint8))}"
+    if isinstance(value, type):
+        return f"{value.__module__}.{value.__qualname__}"
+    if hasattr(value, "__dict__") and type(value).__repr__ is object.__repr__:  # e.g. make_column_selector
+        return {"class": type(value).__qualname__, **{str(k): _describe(v) for k, v in vars(value).items()}}
+    return repr(value)
+
+
+def _ramico_version() -> str:
+    from ramico import __version__
+
+    return __version__
 
 
 def benjamini_hochberg(p_values: Sequence[float]) -> np.ndarray:

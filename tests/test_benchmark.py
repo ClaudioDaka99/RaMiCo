@@ -184,3 +184,59 @@ def test_estimators_are_recognised_by_their_parameters():
     assert key(sklearn_tree.DecisionTreeClassifier(max_depth=3)) != key(
         sklearn_tree.DecisionTreeClassifier(max_depth=4)
     )
+
+
+def test_the_cache_key_sees_dtypes_and_callables(tmp_path, monkeypatch):
+    X, y = _data()
+    kwargs = dict(
+        strategies=["random"],
+        seeds=[1],
+        n_factuals=3,
+        n_counterfactuals=3,
+        split=benchmark.balanced_split(0.1),
+        isolation_forest="native",
+        categorical_features=["color", "segment", "flag"],
+        cache_dir=tmp_path,
+        progress=False,
+    )
+    benchmark.run_benchmark(lambda seed: FittedToy(2), X, y, **kwargs)
+    saved = next(tmp_path.glob("*.json")).read_text(encoding="utf-8")
+    assert '"ramico"' in saved and '"dtypes"' in saved
+
+    def fail(*args, **kwargs):
+        raise AssertionError("recomputed")
+
+    monkeypatch.setattr(benchmark.RaMiCo, "fit", fail)
+    numeric = X.select_dtypes("number").columns[0]
+    with pytest.raises(AssertionError, match="recomputed"):  # the same values as categories are other data
+        benchmark.run_benchmark(lambda seed: FittedToy(2), X.astype({numeric: "category"}), y, **kwargs)
+
+
+def test_functions_and_random_states_are_described_without_addresses():
+    sklearn = pytest.importorskip("sklearn")
+    from sklearn.compose import make_column_selector, make_column_transformer
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import FunctionTransformer, StandardScaler
+    from sklearn.tree import DecisionTreeClassifier
+
+    def build(state):
+        return make_pipeline(
+            make_column_transformer((StandardScaler(), make_column_selector(dtype_include="number"))),
+            FunctionTransformer(lambda values: values * 2),
+            DecisionTreeClassifier(random_state=np.random.RandomState(state)),
+        )
+
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # no memory address left in the description
+        assert benchmark._model_key(build(0)) == benchmark._model_key(build(0))
+    assert benchmark._model_key(build(0)) != benchmark._model_key(build(1))
+    assert sklearn
+
+    class Opaque:
+        def __init__(self):
+            self.thing = object()
+
+    with pytest.warns(RuntimeWarning, match="memory address"):
+        benchmark._model_key(Opaque())
