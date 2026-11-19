@@ -34,7 +34,7 @@ The core needs only numpy, pandas and gower. Optional extras add the rest:
 | `ramico[viz]` | plotly, matplotlib, great_tables, kaleido | tables and charts |
 | `ramico[benchmark]` | scipy, tqdm | `ramico.benchmark` and its statistical tests |
 | `ramico[plausibility]` | YDF | the Isolation Forest of the paper; RaMiCo has its own otherwise (YDF has Windows wheels only up to Python 3.12) |
-| `ramico[tutorials]` | all of the above, scikit-learn, XGBoost, ipykernel, Jinja2 | the notebooks in `examples/` |
+| `ramico[tutorials]` | all of the above, scikit-learn, XGBoost, imbalanced-learn, ipykernel, Jinja2 | the notebooks in `examples/` |
 
 Extras combine: `pip install "ramico[viz,benchmark]"`. RaMiCo supports Python 3.11 to 3.13.
 
@@ -215,7 +215,8 @@ rules = RaMiCo(model, strategy="nearest", random_state=0).fit(data.X, data.y)
 | [01 · Quickstart](examples/01_quickstart.ipynb) | rules of a heart-disease classifier, the anatomy of a rule, all the rules as a graph, the three metrics, saving and reloading the results | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ClaudioDaka99/RaMiCo/blob/main/examples/01_quickstart.ipynb) |
 | [02 · Mining strategies](examples/02_mining_strategies.ipynb) | the pairs of each strategy, their comparison on Adult over 30 seeds, the Pareto trade-off | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ClaudioDaka99/RaMiCo/blob/main/examples/02_mining_strategies.ipynb) |
 
-Both notebooks have a `QUICK` parameter for a short run with the same tables and figures. Run them with
+Both notebooks have a `QUICK` parameter for a short run with the same tables and figures, and a `MODEL` parameter
+that chooses the black box of the paper: `"xgboost"` (the runs shown) or `"mlp"`. Run them with
 `pip install "ramico[tutorials]"`.
 
 ## Reproducing the paper

@@ -13,7 +13,7 @@ The core depends only on numpy, pandas and gower. Optional extras add the rest:
 | `ramico[viz]` | plotly, matplotlib, great_tables, kaleido | tables (`RuleSet.to_table`) and charts (`ramico.viz`); kaleido exports the PNG copies of the figures |
 | `ramico[benchmark]` | scipy, tqdm | `ramico.benchmark` and its statistical tests |
 | `ramico[plausibility]` | YDF | the Isolation Forest of the paper |
-| `ramico[tutorials]` | the three above, scikit-learn, XGBoost, ipykernel, Jinja2 | the notebooks in `examples/` |
+| `ramico[tutorials]` | the three above, scikit-learn, XGBoost, imbalanced-learn, ipykernel, Jinja2 | the notebooks in `examples/` |
 
 Extras combine, for instance `pip install "ramico[viz,benchmark]"`. A missing extra raises
 `ramico.exceptions.MissingDependencyError`, whose message names the extra to install.

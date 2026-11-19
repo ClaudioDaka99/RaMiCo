@@ -31,7 +31,8 @@ First release as an installable package. The code was previously developed, as r
   viewers that do not run JavaScript.
 - A native Isolation Forest following YDF's algorithm, deterministic and without dependencies; YDF is used when
   installed (`ramico[plausibility]`).
-- Two tutorials in `examples/` (a quickstart on Heart Disease, the mining strategies compared on Adult),
+- Two tutorials in `examples/` (a quickstart on Heart Disease, the mining strategies compared on Adult), each with
+  the XGBoost or the MLP black box of the paper,
   documentation, golden tests of the original behaviour and unit tests.
 
 ### Changed
