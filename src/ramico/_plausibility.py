@@ -100,7 +100,19 @@ class AnomalyScorer:
 
     def predict(self, data: pd.DataFrame) -> np.ndarray:
         """Anomaly score of every row of ``data`` (higher is more anomalous)."""
+        if self.engine.startswith("ydf"):
+            data = _for_ydf(data)
         return np.asarray(self.model.predict(data))
+
+
+def _for_ydf(data: pd.DataFrame) -> pd.DataFrame:
+    """``data`` with its object columns, the categorical features, as text.
+
+    YDF reads an object column as categorical only when it holds strings: a
+    categorical feature coded by floats (0.0, 1.0...) makes it fail.
+    """
+    text = [column for column in data.columns if pd.api.types.is_object_dtype(data[column].dtype)]
+    return data.astype(dict.fromkeys(text, str)) if text else data
 
 
 def fit_isolation_forest(data: pd.DataFrame, engine: str = "auto", random_state: int | None = None) -> AnomalyScorer:
@@ -136,7 +148,7 @@ def fit_isolation_forest(data: pd.DataFrame, engine: str = "auto", random_state:
                 stacklevel=3,
             )
         with native_output_silenced():  # YDF 0.8.0 logs from C++ even with verbose=0
-            model = ydf.IsolationForestLearner(**YDF_PARAMS).train(data, verbose=0)
+            model = ydf.IsolationForestLearner(**YDF_PARAMS).train(_for_ydf(data), verbose=0)
         version = getattr(ydf, "__version__", None)
         return AnomalyScorer(model, f"ydf {version}" if version else "ydf")
     logger.info("Training the native Isolation Forest (1000 trees)")

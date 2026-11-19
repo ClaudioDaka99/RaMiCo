@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import types
 import warnings
 from pathlib import Path
 
@@ -77,3 +78,38 @@ def test_real_ydf_trains_without_printing(capfd):
     plausibility.fit_isolation_forest(data, engine="ydf")
     out, err = capfd.readouterr()
     assert out == "" and err == ""
+
+
+def test_ydf_gets_the_categorical_features_as_text(monkeypatch):
+    # YDF refuses an object column of floats, e.g. a categorical feature coded 0.0, 1.0...
+    seen = {}
+
+    class Model:
+        def predict(self, data):
+            seen["predict"] = data
+            return np.zeros(len(data))
+
+    class Learner:
+        def __init__(self, **params):
+            pass
+
+        def train(self, data, **kwargs):
+            seen["train"] = data
+            return Model()
+
+    module = types.ModuleType("ydf")
+    module.IsolationForestLearner = Learner
+    monkeypatch.setitem(sys.modules, "ydf", module)
+    data = pd.DataFrame({"code": pd.Series([0.0, 1.0, 2.0] * 100, dtype=object), "x": np.arange(300.0)})
+    plausibility.fit_isolation_forest(data, engine="ydf").predict(data)
+    for frame in seen.values():
+        assert frame["code"].map(type).eq(str).all() and frame["x"].dtype == np.float64
+    assert data["code"].map(type).eq(float).all()  # the caller's data are left as they were
+
+
+def test_real_ydf_accepts_categorical_features_coded_by_floats(capfd):  # capfd: YDF's output is redirected
+    pytest.importorskip("ydf")
+    rng = np.random.default_rng(0)
+    data = pd.DataFrame({"code": pd.Series(rng.choice([0.0, 1.0, 2.0], 300), dtype=object), "x": rng.normal(size=300)})
+    scorer = plausibility.fit_isolation_forest(data, engine="ydf")
+    assert np.isfinite(scorer.predict(data)).all()
