@@ -21,6 +21,7 @@ import hashlib
 import os
 import shutil
 import tempfile
+import urllib.error
 import urllib.request
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -87,12 +88,19 @@ def _fetch(name: str, data_home: str | Path | None, download: bool) -> Path:
     if target.exists() and _sha256(target) == checksum:
         return target
     if not download:
-        raise DataError(f"{target} is missing and download=False")
+        state = "does not match its checksum (damaged or incomplete)" if target.exists() else "is missing"
+        raise DataError(f"{target} {state} and download=False: download it again with download=True")
     with tempfile.NamedTemporaryFile(delete=False, dir=target.parent, suffix=".part") as partial:
         temporary = Path(partial.name)
     try:
-        with urllib.request.urlopen(url, timeout=60) as response, open(temporary, "wb") as stream:
-            shutil.copyfileobj(response, stream)
+        try:
+            with urllib.request.urlopen(url, timeout=60) as response, open(temporary, "wb") as stream:
+                shutil.copyfileobj(response, stream)
+        except urllib.error.URLError as exc:
+            raise DataError(
+                f"could not download {url} ({exc.reason}). Check the connection, or save the file as {target} "
+                "and load the dataset with download=False (data_home or RAMICO_DATA choose the folder)"
+            ) from exc
         if _sha256(temporary) != checksum:
             raise DataError(f"the file downloaded from {url} does not match its expected checksum")
         temporary.replace(target)

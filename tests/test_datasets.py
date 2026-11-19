@@ -94,3 +94,19 @@ def test_data_home_from_environment(monkeypatch, tmp_path):
     monkeypatch.setenv("RAMICO_DATA", str(tmp_path / "cache"))
     assert datasets.get_data_home() == tmp_path / "cache"
     assert (tmp_path / "cache").is_dir()
+
+
+def test_damaged_file_without_download(fake_download, tmp_path):
+    (tmp_path / "processed.cleveland.data").write_text("damaged")
+    with pytest.raises(DataError, match="does not match its checksum"):
+        datasets.load_heart_disease(data_home=tmp_path, download=False)
+
+
+def test_offline_download_explains_what_to_do(fake_download, tmp_path, monkeypatch):
+    def offline(url, timeout):
+        raise datasets.urllib.error.URLError("no network")
+
+    monkeypatch.setattr(datasets.urllib.request, "urlopen", offline)
+    with pytest.raises(DataError, match=r"could not download .*download=False"):
+        datasets.load_heart_disease(data_home=tmp_path)
+    assert not list(tmp_path.iterdir())  # nothing half-written is left behind
