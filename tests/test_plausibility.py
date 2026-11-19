@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys
 import types
 import warnings
@@ -16,6 +17,9 @@ import _harness as h
 
 from ramico import _plausibility as plausibility
 from ramico.exceptions import MissingDependencyError
+
+with contextlib.suppress(ImportError):  # YDF keeps the output streams of its first import: import it now,
+    import ydf  # noqa: F401  # not inside a test whose captured streams are closed after it
 
 
 @pytest.fixture(scope="module")
@@ -100,10 +104,20 @@ def test_ydf_gets_the_categorical_features_as_text(monkeypatch):
     module = types.ModuleType("ydf")
     module.IsolationForestLearner = Learner
     monkeypatch.setitem(sys.modules, "ydf", module)
-    data = pd.DataFrame({"code": pd.Series([0.0, 1.0, 2.0] * 100, dtype=object), "x": np.arange(300.0)})
-    plausibility.fit_isolation_forest(data, engine="ydf").predict(data)
-    for frame in seen.values():
-        assert frame["code"].map(type).eq(str).all() and frame["x"].dtype == np.float64
+    data = pd.DataFrame(
+        {
+            "code": pd.Series([0.0, 1.0, 2.0] * 100, dtype=object),
+            "flag": pd.Series([True, False, True] * 100, dtype=object),
+            "x": np.arange(300.0),
+        }
+    )
+    scorer = plausibility.fit_isolation_forest(data, engine="ydf")
+    trained = seen["train"]
+    assert trained["code"].map(type).eq(str).all() and trained["x"].dtype == np.float64
+    # the switched rows rebuild these features from their values: floats and booleans, no longer objects
+    scorer.predict(data.astype({"code": float, "flag": bool}))
+    scored = seen["predict"]
+    assert set(scored["code"]) <= set(trained["code"]) and set(scored["flag"]) <= set(trained["flag"])
     assert data["code"].map(type).eq(float).all()  # the caller's data are left as they were
 
 
@@ -113,3 +127,19 @@ def test_real_ydf_accepts_categorical_features_coded_by_floats(capfd):  # capfd:
     data = pd.DataFrame({"code": pd.Series(rng.choice([0.0, 1.0, 2.0], 300), dtype=object), "x": rng.normal(size=300)})
     scorer = plausibility.fit_isolation_forest(data, engine="ydf")
     assert np.isfinite(scorer.predict(data)).all()
+
+
+def test_fit_with_ydf_and_categorical_features_coded_by_floats(capfd):  # capfd: YDF's output is redirected
+    pytest.importorskip("ydf")
+    rng = np.random.default_rng(1)
+    X = pd.DataFrame({"code": rng.choice([0.0, 1.0, 2.0], 300), "x": rng.uniform(0, 10, 300)})
+
+    def model(d):
+        return ((d["x"] > 5) | (d["code"] == 2.0)).astype(int).to_numpy()
+
+    from ramico import RaMiCo
+
+    rules = RaMiCo(model, "random", n_factuals=5, n_counterfactuals=5, random_state=0, isolation_forest="ydf").fit(
+        X, model(X), categorical_features=["code"]
+    )
+    assert len(rules) > 0 and rules.to_frame()["implausibility"].notna().all()
