@@ -64,6 +64,8 @@ def main() -> None:
     parser.add_argument("--out", type=Path, help="folder for the executed notebooks (default: in place)")
     parser.add_argument("--timeout", type=int, help="seconds allowed to each cell")
     args = parser.parse_args()
+    if args.model and not args.out:  # the published notebooks hold the runs their text describes
+        parser.error("--model needs --out: the notebooks in examples/ keep the runs of their own MODEL")
     notebooks = sorted(EXAMPLES.glob("[0-9][0-9]_*.ipynb"))
     if args.tutorials:
         notebooks = [n for n in notebooks if any(n.name.startswith(prefix) for prefix in args.tutorials)]
