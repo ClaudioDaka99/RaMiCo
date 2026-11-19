@@ -1,0 +1,256 @@
+{
+  "generated_at": "2026-10-30T16:39:00+00:00",
+  "source_commit": "d4717facc9464039b3800b38f3bd5d438288649b",
+  "code_under_test_clean": true,
+  "python": "3.11.18",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "packages": {
+    "numpy": "1.26.4",
+    "pandas": "2.2.3",
+    "scipy": "1.13.1",
+    "scikit-learn": "1.5.2",
+    "scikit-learn-extra": "0.3.0",
+    "gower": "0.1.2"
+  },
+  "tolerances": {
+    "rtol": 1e-06,
+    "atol": 1e-09
+  },
+  "ordering_conventions": [
+    "nearest-neighbour selections break ties by position (stable argsort)",
+    "k-medoids heuristic initialisation lists the medoids in sorted order"
+  ],
+  "cases": {
+    "mixed_binary_random": {
+      "n_records": 39,
+      "n_rules": 7,
+      "outputs_differing_with_default_argsort": [
+        "metrics"
+      ],
+      "fidelity_with_default_argsort": {
+        "and": {
+          "3": {
+            "fidelity": 70.0,
+            "tot_nearest_rules": 276.0,
+            "rules_per_sample": 1.725
+          },
+          "7": {
+            "fidelity": 93.75,
+            "tot_nearest_rules": 393.0,
+            "rules_per_sample": 2.45625
+          }
+        },
+        "or": {
+          "3": {
+            "fidelity": 65.62,
+            "tot_nearest_rules": 276.0,
+            "rules_per_sample": 1.725
+          },
+          "7": {
+            "fidelity": 77.5,
+            "tot_nearest_rules": 393.0,
+            "rules_per_sample": 2.45625
+          }
+        }
+      }
+    },
+    "mixed_binary_boundary": {
+      "n_records": 55,
+      "n_rules": 11,
+      "outputs_differing_with_default_argsort": [
+        "metrics"
+      ],
+      "fidelity_with_default_argsort": {
+        "and": {
+          "3": {
+            "fidelity": 78.12,
+            "tot_nearest_rules": 342.0,
+            "rules_per_sample": 2.1375
+          },
+          "7": {
+            "fidelity": 96.88,
+            "tot_nearest_rules": 516.0,
+            "rules_per_sample": 3.225
+          }
+        },
+        "or": {
+          "3": {
+            "fidelity": 58.75,
+            "tot_nearest_rules": 342.0,
+            "rules_per_sample": 2.1375
+          },
+          "7": {
+            "fidelity": 67.5,
+            "tot_nearest_rules": 516.0,
+            "rules_per_sample": 3.225
+          }
+        }
+      }
+    },
+    "mixed_binary_prototype": {
+      "n_records": 55,
+      "n_rules": 10,
+      "outputs_differing_with_default_argsort": [
+        "metrics"
+      ],
+      "fidelity_with_default_argsort": {
+        "and": {
+          "3": {
+            "fidelity": 83.12,
+            "tot_nearest_rules": 292.0,
+            "rules_per_sample": 1.825
+          },
+          "7": {
+            "fidelity": 99.38,
+            "tot_nearest_rules": 494.0,
+            "rules_per_sample": 3.0875
+          }
+        },
+        "or": {
+          "3": {
+            "fidelity": 73.75,
+            "tot_nearest_rules": 292.0,
+            "rules_per_sample": 1.825
+          },
+          "7": {
+            "fidelity": 83.12,
+            "tot_nearest_rules": 494.0,
+            "rules_per_sample": 3.0875
+          }
+        }
+      }
+    },
+    "mixed_binary_ensemble": {
+      "n_records": 151,
+      "n_rules": 27,
+      "outputs_differing_with_default_argsort": [
+        "metrics"
+      ],
+      "fidelity_with_default_argsort": {
+        "and": {
+          "3": {
+            "fidelity": 83.12,
+            "tot_nearest_rules": 307.0,
+            "rules_per_sample": 1.91875
+          },
+          "7": {
+            "fidelity": 97.5,
+            "tot_nearest_rules": 500.0,
+            "rules_per_sample": 3.125
+          }
+        },
+        "or": {
+          "3": {
+            "fidelity": 72.5,
+            "tot_nearest_rules": 307.0,
+            "rules_per_sample": 1.91875
+          },
+          "7": {
+            "fidelity": 79.38,
+            "tot_nearest_rules": 500.0,
+            "rules_per_sample": 3.125
+          }
+        }
+      }
+    },
+    "numeric_binary_ensemble": {
+      "n_records": 159,
+      "n_rules": 20,
+      "outputs_differing_with_default_argsort": [
+        "metrics"
+      ],
+      "fidelity_with_default_argsort": {
+        "and": {
+          "3": {
+            "fidelity": 94.29,
+            "tot_nearest_rules": 253.0,
+            "rules_per_sample": 1.8071428571428572
+          },
+          "7": {
+            "fidelity": 100.0,
+            "tot_nearest_rules": 327.0,
+            "rules_per_sample": 2.335714285714286
+          }
+        },
+        "or": {
+          "3": {
+            "fidelity": 88.57,
+            "tot_nearest_rules": 253.0,
+            "rules_per_sample": 1.8071428571428572
+          },
+          "7": {
+            "fidelity": 89.29,
+            "tot_nearest_rules": 327.0,
+            "rules_per_sample": 2.335714285714286
+          }
+        }
+      }
+    },
+    "mixed_multiclass_random": {
+      "n_records": 123,
+      "n_rules": 26,
+      "outputs_differing_with_default_argsort": [
+        "metrics"
+      ],
+      "fidelity_with_default_argsort": {
+        "and": {
+          "3": {
+            "fidelity": 81.25,
+            "tot_nearest_rules": 402.0,
+            "rules_per_sample": 2.5125
+          },
+          "7": {
+            "fidelity": 85.62,
+            "tot_nearest_rules": 633.0,
+            "rules_per_sample": 3.95625
+          }
+        },
+        "or": {
+          "3": {
+            "fidelity": 78.12,
+            "tot_nearest_rules": 402.0,
+            "rules_per_sample": 2.5125
+          },
+          "7": {
+            "fidelity": 94.38,
+            "tot_nearest_rules": 633.0,
+            "rules_per_sample": 3.95625
+          }
+        }
+      }
+    },
+    "mixed_multiclass_ensemble": {
+      "n_records": 420,
+      "n_rules": 66,
+      "outputs_differing_with_default_argsort": [
+        "metrics"
+      ],
+      "fidelity_with_default_argsort": {
+        "and": {
+          "3": {
+            "fidelity": 90.0,
+            "tot_nearest_rules": 356.0,
+            "rules_per_sample": 2.225
+          },
+          "7": {
+            "fidelity": 93.12,
+            "tot_nearest_rules": 587.0,
+            "rules_per_sample": 3.66875
+          }
+        },
+        "or": {
+          "3": {
+            "fidelity": 80.62,
+            "tot_nearest_rules": 356.0,
+            "rules_per_sample": 2.225
+          },
+          "7": {
+            "fidelity": 90.0,
+            "tot_nearest_rules": 587.0,
+            "rules_per_sample": 3.66875
+          }
+        }
+      }
+    }
+  }
+}

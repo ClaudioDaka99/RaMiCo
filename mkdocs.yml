@@ -1,0 +1,76 @@
+site_name: RaMiCo
+site_description: Region-Aware Minimal Counterfactual Rules for black-box classifiers
+site_url: https://claudiodaka99.github.io/RaMiCo/
+repo_url: https://github.com/ClaudioDaka99/RaMiCo
+repo_name: ClaudioDaka99/RaMiCo
+copyright: Copyright © 2026 Claudio Daka, Guido Gagliardi, Antonio Luca Alfeo, Mario G. C. A. Cimino
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+
+hooks:
+  - tools/docs_hooks.py  # copies the executed notebooks of examples/ into docs/tutorials/
+
+plugins:
+  - search
+  - mkdocs-jupyter:
+      execute: false  # the notebooks are published with the outputs they were committed with
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_source: false
+            show_root_heading: true
+            members_order: source
+            separate_signature: true
+
+markdown_extensions:
+  - admonition
+  - tables
+  - attr_list
+  - md_in_html
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Concepts:
+      - The algorithm: concepts/algorithm.md
+      - Mining strategies: concepts/strategies.md
+      - Metrics: concepts/metrics.md
+  - Tutorials:
+      - 01 · Quickstart: tutorials/01_quickstart.ipynb
+      - 02 · Mining strategies: tutorials/02_mining_strategies.ipynb
+  - API reference:
+      - RaMiCo and RuleSet: reference/explainer.md
+      - Strategies: reference/strategies.md
+      - Metrics: reference/metrics.md
+      - Benchmark: reference/benchmark.md
+      - Datasets: reference/datasets.md
+      - Visualisation: reference/viz.md
+      - Exceptions: reference/exceptions.md

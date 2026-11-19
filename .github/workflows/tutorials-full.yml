@@ -1,0 +1,40 @@
+name: Tutorials, full run
+
+# Runs the tutorials with the protocol of the paper and keeps the executed notebooks as an artifact, to be committed.
+# Each notebook runs with the QUICK of its parameters cell, False for all of them. GitHub-hosted runners stop a job
+# after 6 hours: run the long ones one at a time (tutorials: "02"), or on a server.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tutorials:
+        description: "Prefixes of the notebooks to run, separated by spaces"
+        default: "01 02"
+      notebook_timeout:
+        description: "Seconds allowed to each notebook cell"
+        default: "21600"
+
+permissions:
+  contents: read
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[tutorials]"
+      - name: Run the tutorials in full mode
+        run: >
+          python tools/run_tutorials.py ${{ github.event.inputs.tutorials }}
+          --out build/notebooks --timeout ${{ github.event.inputs.notebook_timeout }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: notebooks-full
+          path: |
+            build/notebooks/
+            examples/cache/

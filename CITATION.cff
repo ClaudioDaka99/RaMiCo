@@ -1,0 +1,61 @@
+cff-version: 1.2.0
+message: "If you use RaMiCo, please cite the papers below."
+title: "RaMiCo: Region-Aware Minimal Counterfactual Rules"
+type: software
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/ClaudioDaka99/RaMiCo"
+authors:
+  - family-names: Daka
+    given-names: Claudio
+  - family-names: Gagliardi
+    given-names: Guido
+  - family-names: Alfeo
+    given-names: Antonio Luca
+  - family-names: Cimino
+    given-names: Mario G. C. A.
+preferred-citation:
+  type: conference-paper
+  title: "Evaluation of Different Region-Aware Sampling Strategies on Counterfactual Rule Extraction"
+  authors:
+    - family-names: Daka
+      given-names: Claudio
+    - family-names: Gagliardi
+      given-names: Guido
+    - family-names: Alfeo
+      given-names: Antonio Luca
+    - family-names: Cimino
+      given-names: Mario G. C. A.
+  collection-title: "2026 IEEE International Conference on Evolving and Adaptive Intelligent Systems (EAIS)"
+  conference:
+    name: "2026 IEEE International Conference on Evolving and Adaptive Intelligent Systems (EAIS)"
+    city: Pisa
+    country: IT
+    date-start: 2026-09-21
+    date-end: 2026-09-23
+  publisher:
+    name: IEEE
+  start: 1
+  end: 8
+  year: 2026
+  month: 9
+  doi: "10.1109/EAIS69050.2026.11759992"
+  url: "https://ieeexplore.ieee.org/document/11759992"
+references:
+  - type: article
+    title: "Region-aware Minimal Counterfactual Rules for Model-agnostic Explainable Classification"
+    authors:
+      - family-names: Gagliardi
+        given-names: Guido
+      - family-names: Alfeo
+        given-names: Antonio Luca
+      - family-names: Guidotti
+        given-names: Riccardo
+      - family-names: Cimino
+        given-names: Mario G. C. A.
+    journal: "Machine Learning"
+    volume: 114
+    issue: 10
+    start: 225
+    year: 2025
+    doi: "10.1007/s10994-025-06847-5"

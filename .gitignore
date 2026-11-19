@@ -1,0 +1,29 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# PDF files are never tracked (papers, figures, reviews)
+*.pdf
+
+# Local copies of datasets: the package downloads public data on demand
+/data/
+
+# Python tooling artifacts
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+*.egg-info/
+.venv/
+
+# Checkpoints of long tutorial runs
+examples/cache/
+
+# Documentation build
+site/
+.cache/
+docs/tutorials/

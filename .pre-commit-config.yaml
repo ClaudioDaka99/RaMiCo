@@ -1,0 +1,43 @@
+# Install the hooks once with `pre-commit install`;
+# run them on the whole repository with `pre-commit run --all-files`.
+repos:
+  - repo: local
+    hooks:
+      - id: no-pdf
+        name: Blocca file PDF
+        entry: I file PDF non sono ammessi nel repository
+        language: fail
+        files: '\.pdf$'
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: no-commit-to-branch
+        args: [--branch, main]
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      # the golden fixtures are kept byte for byte
+      - id: end-of-file-fixer
+        exclude: ^tests/fixtures/
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: ^tests/fixtures/
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.3
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+        types_or: [python, pyi, jupyter, markdown]  # as `ruff format --check .` in CI
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.4.1
+    hooks:
+      - id: mypy
+        # checks the files listed in pyproject.toml, whatever is staged
+        pass_filenames: false
+        additional_dependencies: ["numpy>=1.24"]

@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main, refactor/pip-package]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      notebook_timeout:
+        description: "Seconds allowed to each notebook cell"
+        default: "1800"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy
+      - name: No PDF file is tracked
+        run: test -z "$(git ls-files '*.pdf')"
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev,plausibility]"
+      - run: pytest --cov=ramico --cov-report=term-missing
+
+  notebooks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[tutorials,dev]"
+      - name: Run the published tutorials with QUICK = True
+        run: >
+          python tools/run_tutorials.py --quick --out build/notebooks
+          --timeout ${{ github.event.inputs.notebook_timeout || vars.NOTEBOOK_TIMEOUT || '1800' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: notebooks-quick
+          path: build/notebooks/
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[docs]"
+      - run: mkdocs build --strict
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site/

@@ -1,0 +1,70 @@
+name: Release
+
+# A tag v* publishes the package on PyPI; a manual run publishes it on TestPyPI.
+# Both use Trusted Publishing (OIDC): no token is stored. Configure the publishers once on pypi.org and
+# test.pypi.org (project "ramico", workflow "release.yml", environments "pypi" and "testpypi").
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: The tag matches the package version, the changelog and CITATION.cff
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(grep -Po '^__version__ = "\K[^"]+' src/ramico/__init__.py)
+          test "v$version" = "$GITHUB_REF_NAME"
+          grep -Eq "^## \[$version\] - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md
+          grep -q "^version: $version$" CITATION.cff
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check --strict dist/*
+      - name: Nothing but the package in the distributions
+        run: |
+          for archive in dist/*.whl; do unzip -l "$archive"; done | grep -E "\.pdf|/data/|examples/|experiments/" && exit 1 || true
+          for archive in dist/*.tar.gz; do tar -tzf "$archive"; done | grep -E "\.pdf|/data/|examples/|experiments/" && exit 1 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  testpypi:
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  pypi:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
