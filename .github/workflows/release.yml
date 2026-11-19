@@ -16,8 +16,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: The tag matches the package version, the changelog and CITATION.cff
@@ -34,7 +34,7 @@ jobs:
         run: |
           for archive in dist/*.whl; do unzip -l "$archive"; done | grep -E "\.pdf|/data/|examples/|experiments/" && exit 1 || true
           for archive in dist/*.tar.gz; do tar -tzf "$archive"; done | grep -E "\.pdf|/data/|examples/|experiments/" && exit 1 || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
@@ -47,7 +47,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
@@ -63,7 +63,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
