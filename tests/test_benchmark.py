@@ -122,3 +122,65 @@ def test_compare_strategies():
     assert random_fidelity.p_value == pytest.approx(raw)
     with pytest.raises(DataError):
         benchmark.compare_strategies(results, reference="nope")
+
+
+def test_a_tied_or_empty_comparison_leaves_the_others_significant():
+    pytest.importorskip("scipy")
+    seeds = list(range(8))
+    rng = np.random.default_rng(0)
+    rows = []
+    for strategy, fidelity, implausibility in (
+        ("ensemble", [100.0] * 8, rng.uniform(0.3, 0.4, 8)),
+        ("random", [100.0] * 8, rng.uniform(0.3, 0.4, 8)),  # tied with the reference on fidelity
+        ("boundary", rng.uniform(70, 85, 8), [np.nan] * 8),  # no rule, so no implausibility
+    ):
+        for seed, f, m in zip(seeds, fidelity, implausibility, strict=True):
+            rows.append(
+                {"seed": seed, "strategy": strategy, "fidelity": f, "incomprehensibility": 2.0, "implausibility": m}
+            )
+    table = benchmark.compare_strategies(pd.DataFrame(rows)).set_index(["metric", "strategy"])
+    assert table["p_adjusted"].notna().all()
+    assert table.loc[("fidelity", "boundary"), "significant"]  # not hidden by the tied random strategy
+    assert table.loc[("fidelity", "random"), "p_value"] == 1.0
+    assert table.loc[("implausibility", "boundary"), "p_value"] == 1.0
+
+
+def test_the_cache_is_not_reused_for_another_model_or_other_data(tmp_path, monkeypatch):
+    X, y = _data()
+    kwargs = dict(
+        strategies=["random"],
+        seeds=[1],
+        n_factuals=3,
+        n_counterfactuals=3,
+        split=benchmark.balanced_split(0.1),
+        isolation_forest="native",
+        categorical_features=["color", "segment", "flag"],
+        cache_dir=tmp_path,
+        progress=False,
+    )
+    benchmark.run_benchmark(lambda seed: FittedToy(2), X, y, **kwargs)
+
+    def fail(*args, **kwargs):
+        raise AssertionError("recomputed")
+
+    monkeypatch.setattr(benchmark.RaMiCo, "fit", fail)
+    benchmark.run_benchmark(lambda seed: FittedToy(2), X, y, **kwargs)  # same model and data: reused
+    with pytest.raises(AssertionError, match="recomputed"):
+        benchmark.run_benchmark(lambda seed: FittedToy(3), X, y, **kwargs)  # another model
+    changed = X.copy()
+    changed.iloc[0, 0] = changed.iloc[1, 0]
+    with pytest.raises(AssertionError, match="recomputed"):
+        benchmark.run_benchmark(lambda seed: FittedToy(2), changed, y, **kwargs)  # other data
+    with pytest.raises(AssertionError, match="recomputed"):
+        benchmark.run_benchmark(lambda seed: FittedToy(2), X, y, **{**kwargs, "split": benchmark.balanced_split(0.2)})
+
+
+def test_estimators_are_recognised_by_their_parameters():
+    sklearn_tree = pytest.importorskip("sklearn.tree")
+    key = benchmark._model_key
+    assert key(sklearn_tree.DecisionTreeClassifier(max_depth=3)) == key(
+        sklearn_tree.DecisionTreeClassifier(max_depth=3)
+    )
+    assert key(sklearn_tree.DecisionTreeClassifier(max_depth=3)) != key(
+        sklearn_tree.DecisionTreeClassifier(max_depth=4)
+    )

@@ -10,7 +10,7 @@ Benjamini-Hochberg correction within each metric.
 Examples
 --------
 >>> from sklearn.linear_model import LogisticRegression          # doctest: +SKIP
->>> from ramico.benchmark import run_benchmark, compare_strategies
+>>> from ramico.benchmark import compare_strategies, paper_seeds, run_benchmark
 >>> results = run_benchmark(lambda seed: LogisticRegression(), X, y,   # doctest: +SKIP
 ...                         seeds=paper_seeds(5), cache_dir="cache")
 >>> compare_strategies(results)                                 # doctest: +SKIP
@@ -18,6 +18,7 @@ Examples
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import time
@@ -153,7 +154,9 @@ def run_benchmark(
         Passed to :meth:`ramico.RaMiCo.fit`.
     cache_dir : str or Path, optional
         Folder where each (seed, strategy) result is saved as it completes;
-        a rerun reuses the results computed with the same settings.
+        a rerun reuses the results computed with the same settings, data,
+        training rows and model parameters (``get_params``, or else the
+        attributes of the unfitted model).
     progress : bool, default=True
         Show a progress bar (needs tqdm).
 
@@ -176,6 +179,8 @@ def run_benchmark(
         "mode": mode,
         "isolation_forest": isolation_forest,
         "n_samples": len(X),
+        "data": _digest(pd.util.hash_pandas_object(X, index=True).to_numpy(), _label_hashes(labels)),
+        "categorical_features": None if categorical_features is None else [str(c) for c in categorical_features],
     }
     cache = Path(cache_dir) if cache_dir is not None else None
     if cache is not None:
@@ -185,17 +190,19 @@ def run_benchmark(
     for seed in _progress(seeds, progress, "seeds"):
         train, _ = split(X, labels, seed)
         X_train, y_train = X.iloc[train], labels[train]
-        model = None
+        model, fitted = make_model(seed), False
+        # a cached result is reused only for the same settings, data, training rows and model parameters
+        run_settings = {**settings, "train": _digest(np.asarray(train, dtype=np.int64)), "model": _model_key(model)}
         for strategy in strategies:
             path = cache / f"{strategy}_seed{seed}.json" if cache is not None else None
             if path is not None and path.exists():
                 saved = json.loads(path.read_text(encoding="utf-8"))
-                if saved.get("settings") == settings:
+                if saved.get("settings") == run_settings:
                     rows.append(saved["result"])
                     continue
-            if model is None:
-                model = make_model(seed)
+            if not fitted:
                 model.fit(X_train, y_train)
+                fitted = True
             start = time.perf_counter()
             rules = RaMiCo(
                 model,
@@ -219,9 +226,46 @@ def run_benchmark(
             }
             rows.append(result)
             if path is not None:
-                path.write_text(json.dumps({"settings": settings, "result": result}), encoding="utf-8")
+                path.write_text(json.dumps({"settings": run_settings, "result": result}), encoding="utf-8")
     # the settings of the run, so that runs with different s and k can be concatenated
     return pd.DataFrame(rows).assign(n_factuals=n_factuals, n_counterfactuals=n_counterfactuals)
+
+
+def _digest(*arrays: np.ndarray) -> str:
+    """Short SHA-256 of the bytes of ``arrays``."""
+    digest = hashlib.sha256()
+    for array in arrays:
+        digest.update(np.ascontiguousarray(array).tobytes())
+    return digest.hexdigest()[:16]
+
+
+def _label_hashes(labels: np.ndarray) -> np.ndarray:
+    return pd.util.hash_pandas_object(pd.Series(labels, dtype=object), index=False).to_numpy()
+
+
+def _model_key(model: Any) -> str:
+    """The class and settings of an unfitted model, as a short digest.
+
+    Estimators with ``get_params`` (scikit-learn, XGBoost...) are described by
+    their parameters, other objects by their attributes. A value whose
+    ``repr`` holds a memory address changes the digest at every run, so that
+    such results are recomputed rather than reused by mistake.
+    """
+    params: Any = None
+    get_params = getattr(model, "get_params", None)
+    if callable(get_params):
+        try:
+            params = get_params(deep=True)
+        except Exception:  # any failure: describe the model by its attributes
+            params = None
+    if not isinstance(params, dict):
+        params = vars(model) if hasattr(model, "__dict__") else {"repr": model}
+    described = {
+        str(name): type(value).__qualname__ if hasattr(value, "get_params") else repr(value)
+        for name, value in params.items()
+    }
+    text = f"{type(model).__module__}.{type(model).__qualname__} {json.dumps(described, sort_keys=True)}"
+    return _digest(np.frombuffer(text.encode("utf-8"), dtype=np.uint8))
 
 
 def benjamini_hochberg(p_values: Sequence[float]) -> np.ndarray:
@@ -272,9 +316,13 @@ def compare_strategies(
         for strategy in [s for s in pd.unique(results["strategy"]) if s != reference]:
             values = results.loc[results["strategy"] == strategy, metric].dropna()
             try:
-                p_value = float(mannwhitneyu(base, values, alternative="two-sided").pvalue)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)  # empty samples: handled below
+                    p_value = float(mannwhitneyu(base, values, alternative="two-sided").pvalue)
             except ValueError:
-                p_value = 1.0  # not enough data, as in the experiments
+                p_value = float("nan")
+            if not np.isfinite(p_value):
+                p_value = 1.0  # not enough data, or all the values tied: no evidence of a difference
             higher_is_better = METRICS.get(metric, "higher") == "higher"
             difference = values.mean() - base.mean()
             family.append(
