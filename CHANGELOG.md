@@ -49,6 +49,8 @@ Compared with the original implementation:
 - Gower distances between two sets of samples of the same size are correct: the `gower` package (0.1.2) computed
   half of them as if the two sets were one, which misplaced the boundary of boundary mining on data with classes
   of equal size. The original code had the same error; the datasets of the paper are not affected.
+- A numerical feature whose maximum is 0 (values such as -10 to 0) counts in the Gower distance: the `gower` package
+  divides by the maximum and left such a feature out. The datasets of the paper have none.
 - Distances and metrics are computed in blocks: the same values, to the last digit, in a fraction of the time on
   large datasets.
 
