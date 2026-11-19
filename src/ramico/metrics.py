@@ -105,6 +105,9 @@ def _prepare(rules: Rules, X: Any) -> pd.DataFrame:
         if features is None or values.ndim != 2 or values.shape[1] != len(features):
             raise DataError("X must be a DataFrame, or an array with the columns the rules were extracted from")
         X = pd.DataFrame(values, columns=features)
+        for column in rules.metadata.get("numerical_features", []):  # an array of mixed data holds objects
+            if column in X.columns and not pd.api.types.is_numeric_dtype(X[column]):
+                X[column] = pd.to_numeric(X[column])
     X = X.copy()
     X.columns = [str(c) for c in X.columns]
     categorical = rules.metadata.get("categorical_features", []) if isinstance(rules, RuleSet) else []
@@ -271,7 +274,11 @@ def _rule_chains(model: Any, rules: Rules, X: Any, k: int) -> tuple[BlackBox, pd
     if not isinstance(k, (int, np.integer)) or k < 1:
         raise ValueError(f"k must be a positive integer, got {k!r}")
     prepared = _prepare(rules, X)
-    black_box = BlackBox(model, ModelView.between(X, prepared))
+    view = ModelView.between(X, prepared)
+    labels = rules.metadata.get("column_labels") if isinstance(rules, RuleSet) else None
+    if labels is not None and not isinstance(X, pd.DataFrame):  # an array: the labels of the data of fit
+        view = ModelView(tuple(labels), view.dtypes)
+    black_box = BlackBox(model, view)
     X = prepared
     return black_box, X, _chains(black_box, _records(rules, X), X, int(k), set(numerical_features(X)))
 

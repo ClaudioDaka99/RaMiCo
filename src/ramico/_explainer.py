@@ -250,6 +250,8 @@ class RaMiCo:
             "numerical_features": numerical_features(X),
             "mined_indices": pd.Series(mined, dtype=object).unique().tolist(),
         }
+        if model.view.labels is not None:  # the caller's column labels, e.g. integers, for the metrics on arrays
+            metadata["column_labels"] = list(model.view.labels)
         features = list(X.columns)
         if not collected:
             warnings.warn(

@@ -338,3 +338,9 @@ def test_the_native_forest_follows_numpy_global_state(data):
     first = explainer.fit(X, y, categorical_features=CATEGORICAL)
     np.random.seed(11)  # noqa: NPY002
     pd.testing.assert_frame_equal(explainer.fit(X, y, categorical_features=CATEGORICAL).records, first.records)
+
+
+def test_values_outside_the_categories_are_kept():
+    view = ModelView(dtypes=(("c", pd.CategoricalDtype(["a", "b"])),))
+    shown = view.apply(pd.DataFrame({"c": pd.Series(["a", "z"], dtype=object)}))
+    assert shown["c"].tolist() == ["a", "z"] and list(shown["c"].cat.categories) == ["a", "b", "z"]

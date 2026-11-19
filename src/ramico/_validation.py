@@ -69,7 +69,10 @@ class ModelView:
         if isinstance(original, pd.DataFrame):
             source, labels = original, list(original.columns)
         else:
-            source, labels = pd.DataFrame(np.asarray(original), columns=frame.columns), list(frame.columns)
+            values = np.asarray(original)
+            if values.dtype == object:  # mixed values: the converted frame is the most typed version of them
+                return cls()
+            source, labels = pd.DataFrame(values, columns=frame.columns), list(frame.columns)
         names = [str(label) for label in labels]
         changed = tuple(
             (name, source[label].dtype)
@@ -81,12 +84,24 @@ class ModelView:
     def apply(self, frame: pd.DataFrame) -> pd.DataFrame:
         """``frame`` with the caller's dtypes and column labels."""
         if self.dtypes:
-            present = {name: dtype for name, dtype in self.dtypes if name in frame.columns}
+            present = {name: _covering(dtype, frame[name]) for name, dtype in self.dtypes if name in frame.columns}
             if present:
                 frame = frame.astype(present)
         if self.labels is not None and [str(label) for label in self.labels] == list(frame.columns):
             frame = frame.set_axis(list(self.labels), axis=1)
         return frame
+
+
+def _covering(dtype: Any, values: pd.Series) -> Any:
+    """``dtype``, with the categories of a categorical dtype extended to every value in ``values``.
+
+    The switched values come from the records: a value missing from the
+    categories of the frame given to the metrics would otherwise become NaN.
+    """
+    if not isinstance(dtype, pd.CategoricalDtype):
+        return dtype
+    extra = [value for value in pd.unique(values.dropna()) if value not in dtype.categories]
+    return pd.CategoricalDtype([*dtype.categories, *extra], ordered=dtype.ordered) if extra else dtype
 
 
 class BlackBox:
@@ -102,10 +117,10 @@ class BlackBox:
                 "model must have a predict(X) method or be a function returning one label "
                 f"per row, got {type(model).__name__}"
             )
-        self._view = view or ModelView()
+        self.view = view or ModelView()
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
-        labels = np.asarray(self._predict(self._view.apply(X)))
+        labels = np.asarray(self._predict(self.view.apply(X)))
         if labels.ndim == 2 and labels.shape[1] == 1:
             labels = labels.ravel()
         if labels.ndim != 1 or len(labels) != len(X):

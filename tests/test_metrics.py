@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent / "golden"))
@@ -193,3 +194,21 @@ def test_invalid_inputs(setup):
         metrics.implausibility(rules.records.drop(columns="implausibility"))
     with pytest.raises(TypeError, match="rules must be a RuleSet or a DataFrame"):
         metrics.implausibility("rules")
+
+
+def test_an_array_gives_the_metrics_of_the_dataframe(setup):
+    model, rules, X = setup
+    assert dict(metrics.evaluate(model, rules, X.to_numpy())) == dict(metrics.evaluate(model, rules, X))
+
+
+def test_metrics_on_an_array_call_the_model_with_the_labels_of_fit():
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({0: rng.uniform(0, 10, 80), 1: rng.choice(["a", "b"], 80)})
+
+    def model(d):  # reads the integer labels of the DataFrame the rules come from
+        return ((d[0] > 5) | (d[1] == "a")).astype(int).to_numpy()
+
+    rules = RaMiCo(model, "random", n_factuals=5, n_counterfactuals=5, random_state=0, isolation_forest="native").fit(
+        X, model(X)
+    )
+    assert dict(metrics.evaluate(model, rules, X.to_numpy())) == dict(metrics.evaluate(model, rules, X))
